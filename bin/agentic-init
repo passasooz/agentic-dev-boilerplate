@@ -1,0 +1,317 @@
+#!/bin/sh
+set -eu
+
+usage() {
+  printf '%s\n' \
+    'Usage: agentic-init [options]' \
+    '' \
+    'Without options, starts the interactive setup.' \
+    '' \
+    'Options:' \
+    '  --target PATH             Exact project directory' \
+    '  --name NAME               Human-readable project name' \
+    '  --description TEXT        One-sentence product description' \
+    '  --stack generic|laravel   Stack profile (interactive default: Laravel)' \
+    '  --admin none|filament     Admin profile (interactive default: Filament with Laravel)' \
+    '  --layer-only              Install instructions without scaffolding the application' \
+    '  --fresh-context           Generate context for a new, unimplemented application' \
+    '  --force                   Overwrite agent-layer destination files' \
+    '  --help                    Show this help'
+}
+
+target=''
+project_name=''
+project_description=''
+stack=''
+admin=''
+force='false'
+layer_only='false'
+fresh_context='false'
+interactive='false'
+default_parent='/Applications/MAMP/htdocs'
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --target) target=${2-}; shift 2 ;;
+    --name) project_name=${2-}; shift 2 ;;
+    --description) project_description=${2-}; shift 2 ;;
+    --stack) stack=${2-}; shift 2 ;;
+    --admin) admin=${2-}; shift 2 ;;
+    --layer-only) layer_only='true'; shift ;;
+    --fresh-context) fresh_context='true'; shift ;;
+    --force) force='true'; shift ;;
+    --help|-h) usage; exit 0 ;;
+    *) printf 'Unknown option: %s\n' "$1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+ask_text() {
+  prompt=$1
+  answer=''
+  while [ -z "$answer" ]; do
+    printf '%s: ' "$prompt" >&2
+    IFS= read -r answer || exit 1
+  done
+  printf '%s' "$answer"
+}
+
+choose() {
+  prompt=$1
+  shift
+  while :; do
+    printf '\n%s\n' "$prompt" >&2
+    option_number=1
+    for option_label in "$@"; do
+      printf '  %s) %s\n' "$option_number" "$option_label" >&2
+      option_number=$((option_number + 1))
+    done
+    printf 'Scelta [1]: ' >&2
+    IFS= read -r choice || exit 1
+    choice=${choice:-1}
+    case "$choice" in
+      *[!0-9]*|'') printf 'Scegli uno dei numeri indicati.\n' >&2 ;;
+      *)
+        if [ "$choice" -ge 1 ] && [ "$choice" -le "$#" ]; then
+          printf '%s' "$choice"
+          return
+        fi
+        printf 'Scegli uno dei numeri indicati.\n' >&2
+        ;;
+    esac
+  done
+}
+
+slugify() {
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//'
+}
+
+if [ -z "$project_name" ]; then
+  interactive='true'
+  project_name=$(ask_text 'Nome del progetto')
+fi
+if [ -z "$project_description" ]; then
+  interactive='true'
+  project_description=$(ask_text 'Descrizione breve')
+fi
+if [ -z "$stack" ]; then
+  interactive='true'
+  stack_choice=$(choose 'Quale stack vuoi usare?' \
+    'Laravel / PHP (consigliato)' \
+    'Generico / altro stack')
+  case "$stack_choice" in 1) stack='laravel' ;; 2) stack='generic' ;; esac
+fi
+if [ -z "$admin" ]; then
+  interactive='true'
+  if [ "$stack" = 'laravel' ]; then
+    admin_choice=$(choose 'Serve una dashboard o area amministrativa?' \
+      'Sì, usa Filament (consigliato)' \
+      'No, nessuna area admin')
+    case "$admin_choice" in 1) admin='filament' ;; 2) admin='none' ;; esac
+  else
+    admin='none'
+  fi
+fi
+
+if [ -z "$target" ]; then
+  interactive='true'
+  project_slug=$(slugify "$project_name")
+  if [ -z "$project_slug" ]; then
+    printf 'Impossibile ricavare il nome della cartella dal nome progetto. Usa --target.\n' >&2
+    exit 2
+  fi
+  location_choice=$(choose "Dove creo la cartella '$project_slug'?" \
+    "$default_parent (predefinito)" \
+    'Scegli un altro percorso base')
+  case "$location_choice" in
+    1) target="$default_parent/$project_slug" ;;
+    2)
+      custom_parent=$(ask_text 'Percorso base personalizzato')
+      target="${custom_parent%/}/$project_slug"
+      ;;
+  esac
+fi
+
+case "$stack" in generic|laravel) ;; *) printf 'Unsupported stack: %s\n' "$stack" >&2; exit 2 ;; esac
+case "$admin" in none|filament) ;; *) printf 'Unsupported admin profile: %s\n' "$admin" >&2; exit 2 ;; esac
+if [ "$admin" = 'filament' ] && [ "$stack" != 'laravel' ]; then
+  printf 'The Filament profile requires --stack laravel.\n' >&2
+  exit 2
+fi
+
+if [ "$interactive" = 'true' ]; then
+  printf '\nRiepilogo\n' >&2
+  printf '  Nome:        %s\n' "$project_name" >&2
+  printf '  Descrizione: %s\n' "$project_description" >&2
+  printf '  Stack:       %s\n' "$stack" >&2
+  printf '  Admin:       %s\n' "$admin" >&2
+  printf '  Destinazione: %s\n' "$target" >&2
+  confirm_choice=$(choose 'Procedo con la creazione?' 'Sì, procedi' 'No, annulla')
+  if [ "$confirm_choice" != '1' ]; then
+    printf 'Operazione annullata.\n'
+    exit 0
+  fi
+fi
+
+script_path=$0
+while [ -L "$script_path" ]; do
+  link_target=$(readlink "$script_path")
+  case "$link_target" in
+    /*) script_path=$link_target ;;
+    *) script_path=$(dirname -- "$script_path")/$link_target ;;
+  esac
+done
+script_dir=$(CDPATH= cd -- "$(dirname -- "$script_path")" && pwd)
+kit_root=$(dirname -- "$script_dir")
+
+destinations='AGENTS.md CLAUDE.md docs/ai/product.md docs/ai/architecture.md docs/ai/commands.md docs/ai/decisions.md docs/ai/state.md docs/ai/stack.md docs/ai/bootstrap.md docs/tasks/_template.md'
+if [ "$admin" = 'filament' ]; then
+  destinations="$destinations docs/ai/admin.md"
+fi
+if [ "$force" != 'true' ]; then
+  collisions=''
+  for relative_path in $destinations; do
+    if [ -e "$target/$relative_path" ]; then
+      collisions="$collisions $relative_path"
+    fi
+  done
+  if [ -n "$collisions" ]; then
+    printf 'Refusing to overwrite existing files:%s\n' "$collisions" >&2
+    printf 'Use --force only after reviewing them.\n' >&2
+    exit 3
+  fi
+fi
+
+if [ "$stack" = 'laravel' ] && [ "$layer_only" != 'true' ] && [ ! -f "$target/artisan" ]; then
+  if ! command -v php >/dev/null 2>&1 || ! command -v composer >/dev/null 2>&1; then
+    printf 'PHP and Composer are required to create a Laravel project.\n' >&2
+    exit 4
+  fi
+
+  target_parent=$(dirname -- "$target")
+  mkdir -p "$target_parent"
+  stage_root=$(mktemp -d "$target_parent/.agentic-init.XXXXXX")
+  stage_project="$stage_root/project"
+  cleanup_stage() {
+    rm -rf "$stage_root"
+  }
+  trap cleanup_stage EXIT HUP INT TERM
+
+  printf '\n[1/4] Creo il progetto Laravel...\n'
+  composer create-project laravel/laravel "$stage_project" --no-interaction
+
+  if [ "$admin" = 'filament' ]; then
+    printf '\n[2/4] Installo Filament...\n'
+    (
+      cd "$stage_project"
+      composer require 'filament/filament:^5.0' --no-interaction
+      php artisan filament:install --panels --no-interaction
+    )
+  else
+    printf '\n[2/4] Filament non richiesto.\n'
+  fi
+
+  printf '\n[3/4] Installo e compilo gli asset frontend...\n'
+  (
+    cd "$stage_project"
+    npm install
+    npm run build
+  )
+
+  if [ -d "$target" ]; then
+    cp -R "$stage_project/." "$target/"
+  else
+    mv "$stage_project" "$target"
+  fi
+  cleanup_stage
+  trap - EXIT HUP INT TERM
+  fresh_context='true'
+elif [ "$stack" = 'laravel' ] && [ "$layer_only" != 'true' ]; then
+  printf '\nProgetto Laravel esistente rilevato: mantengo il codice applicativo.\n'
+  if [ "$admin" = 'filament' ] && ! (cd "$target" && composer show filament/filament >/dev/null 2>&1); then
+    printf '[2/4] Installo Filament nel progetto esistente...\n'
+    (
+      cd "$target"
+      composer require 'filament/filament:^5.0' --no-interaction
+      php artisan filament:install --panels --no-interaction
+    )
+  fi
+fi
+
+printf '\n[4/4] Installo il layer agentico...\n'
+mkdir -p "$target/docs/ai" "$target/docs/tasks"
+
+copy_file() {
+  source_file=$1
+  destination_file=$2
+  cp "$source_file" "$destination_file"
+}
+
+copy_file "$kit_root/templates/AGENTS.md" "$target/AGENTS.md"
+copy_file "$kit_root/templates/CLAUDE.md" "$target/CLAUDE.md"
+copy_file "$kit_root/templates/context/PRODUCT.md" "$target/docs/ai/product.md"
+copy_file "$kit_root/templates/context/ARCHITECTURE.md" "$target/docs/ai/architecture.md"
+copy_file "$kit_root/templates/context/COMMANDS.md" "$target/docs/ai/commands.md"
+copy_file "$kit_root/templates/context/DECISIONS.md" "$target/docs/ai/decisions.md"
+copy_file "$kit_root/templates/context/STATE.md" "$target/docs/ai/state.md"
+copy_file "$kit_root/profiles/$stack/STACK.md" "$target/docs/ai/stack.md"
+copy_file "$kit_root/prompts/bootstrap-project.md" "$target/docs/ai/bootstrap.md"
+copy_file "$kit_root/templates/tasks/feature.md" "$target/docs/tasks/_template.md"
+
+if [ "$admin" = 'filament' ]; then
+  copy_file "$kit_root/profiles/filament/ADMIN.md" "$target/docs/ai/admin.md"
+  printf '\nFor Filament work, also read `docs/ai/admin.md`.\n' >> "$target/docs/ai/stack.md"
+fi
+
+if [ "$stack" = 'laravel' ] && [ "$fresh_context" = 'true' ]; then
+  copy_file "$kit_root/profiles/laravel/fresh/PRODUCT.md" "$target/docs/ai/product.md"
+  copy_file "$kit_root/profiles/laravel/fresh/ARCHITECTURE.md" "$target/docs/ai/architecture.md"
+  copy_file "$kit_root/profiles/laravel/fresh/COMMANDS.md" "$target/docs/ai/commands.md"
+  copy_file "$kit_root/profiles/laravel/fresh/STATE.md" "$target/docs/ai/state.md"
+
+  verified_date=$(date +%Y-%m-%d)
+  laravel_version=$(cd "$target" && php artisan --version)
+  php_version=$(php -r 'echo PHP_VERSION;')
+  node_version=$(node --version 2>/dev/null || printf 'not available')
+  if [ "$admin" = 'filament' ]; then
+    admin_system='- Filament admin panel registered at `/admin`.'
+    admin_state='- Filament panel installed and admin routes registered.'
+    admin_index='| Admin panel | `app/Providers/Filament/AdminPanelProvider.php` | `php artisan route:list --path=admin` |'
+  else
+    admin_system='- No administration panel was requested.'
+    admin_state='- No administration panel installed.'
+    admin_index='| Admin UI | Not installed | Add only through an accepted task |'
+  fi
+  PROJECT_DESCRIPTION=$project_description ADMIN_SYSTEM=$admin_system VERIFIED_DATE=$verified_date \
+    LARAVEL_VERSION=$laravel_version PHP_VERSION=$php_version NODE_VERSION=$node_version \
+    ADMIN_STATE=$admin_state ADMIN_INDEX=$admin_index perl -0pi -e \
+    's/\{\{PROJECT_DESCRIPTION\}\}/$ENV{PROJECT_DESCRIPTION}/g;
+     s/\{\{ADMIN_SYSTEM\}\}/$ENV{ADMIN_SYSTEM}/g;
+     s/\{\{VERIFIED_DATE\}\}/$ENV{VERIFIED_DATE}/g;
+     s/\{\{LARAVEL_VERSION\}\}/$ENV{LARAVEL_VERSION}/g;
+     s/\{\{PHP_VERSION\}\}/$ENV{PHP_VERSION}/g;
+     s/\{\{NODE_VERSION\}\}/$ENV{NODE_VERSION}/g;
+     s/\{\{ADMIN_STATE\}\}/$ENV{ADMIN_STATE}/g;
+     s/\{\{ADMIN_INDEX\}\}/$ENV{ADMIN_INDEX}/g' \
+    "$target/docs/ai/product.md" "$target/docs/ai/architecture.md" "$target/docs/ai/state.md"
+fi
+
+PROJECT_NAME=$project_name PROJECT_DESCRIPTION=$project_description perl -0pi -e \
+  's/\{\{PROJECT_NAME\}\}/$ENV{PROJECT_NAME}/g; s/\{\{PROJECT_DESCRIPTION\}\}/$ENV{PROJECT_DESCRIPTION}/g' \
+  "$target/AGENTS.md"
+
+if command -v git >/dev/null 2>&1 && [ ! -d "$target/.git" ]; then
+  git -C "$target" init >/dev/null
+fi
+
+printf '\nProgetto pronto in %s\n' "$target"
+if [ "$stack" = 'laravel' ] && [ "$layer_only" != 'true' ]; then
+  printf 'Laravel è installato e gli asset sono compilati.\n'
+  if [ "$admin" = 'filament' ]; then
+    printf 'Filament è installato; il pannello sarà disponibile su /admin dopo aver creato un utente.\n'
+  fi
+fi
+if [ "$fresh_context" = 'true' ]; then
+  printf 'Il contesto iniziale è già compilato: apri il progetto e definisci il primo brief in docs/tasks/.\n'
+else
+  printf 'Apri la cartella nel tuo editor e chiedi all’agente di eseguire docs/ai/bootstrap.md.\n'
+fi

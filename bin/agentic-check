@@ -1,0 +1,36 @@
+#!/bin/sh
+set -eu
+
+target=${1:-.}
+failed='false'
+required_files='AGENTS.md CLAUDE.md docs/ai/product.md docs/ai/architecture.md docs/ai/stack.md docs/ai/commands.md docs/ai/decisions.md docs/ai/state.md docs/ai/bootstrap.md docs/tasks/_template.md'
+
+for relative_path in $required_files; do
+  if [ ! -f "$target/$relative_path" ]; then
+    printf 'Missing: %s\n' "$relative_path" >&2
+    failed='true'
+  fi
+done
+
+if [ "$failed" = 'true' ]; then
+  exit 1
+fi
+
+context_files="$target/AGENTS.md $target/docs/ai/product.md $target/docs/ai/architecture.md $target/docs/ai/stack.md $target/docs/ai/commands.md $target/docs/ai/decisions.md $target/docs/ai/state.md"
+
+if grep -n -F 'TODO(agent)' $context_files >/dev/null; then
+  printf 'Unresolved bootstrap markers:\n' >&2
+  grep -n -F 'TODO(agent)' $context_files >&2
+  failed='true'
+fi
+
+if grep -R -n -E '\{\{[A-Z_]+\}\}|\[[A-Z_]+\]' "$target/AGENTS.md" "$target/docs/ai" >/dev/null; then
+  printf 'Unresolved template placeholders found.\n' >&2
+  failed='true'
+fi
+
+if [ "$failed" = 'true' ]; then
+  exit 1
+fi
+
+printf 'Agentic layer is complete: %s\n' "$target"
