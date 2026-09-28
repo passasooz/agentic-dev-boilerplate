@@ -1,7 +1,7 @@
 # Agentic Development Boilerplate
 
-Reusable operating layer for AI-assisted software projects. It captures the working patterns
-validated in Clayos and prenotazioni-wa without copying their product-specific rules.
+Reusable operating layer for AI-assisted software projects. It captures field-tested working
+patterns without carrying product-specific rules or references to private repositories.
 
 The goal is to let Codex, Claude, or another coding agent start with a small, accurate context,
 discover only what a task needs, and record decisions so that later tasks do not repeat the same
@@ -44,23 +44,16 @@ inspection, then run:
 See [`docs/quickstart.md`](docs/quickstart.md) for the recommended flow for a new MVP and
 [`docs/operating-model.md`](docs/operating-model.md) for the issue-to-verification method.
 
-## Current sources
+## Foundations
 
-- `Clayos-v2`: a deep, spec-driven development system with package-local instructions,
-  constraint tests, task phases, and project skills.
-- `Clayos-web`: a lightweight router with framework freshness rules, design/copy context, and
-  optional skills activated by task type.
-- `prenotazioni-wa`: a compact Laravel/Filament operating guide centered on documented commands,
-  minimal scope, targeted verification, and code/tests as evidence of current behavior.
-
-Future repositories can be added as another source without changing the observations already
-recorded for these three.
+The boilerplate is based on reusable engineering practices: small cross-agent entrypoints,
+task-routed context, explicit sources of truth, OOP boundaries, focused verification, immutable
+migration history, and durable decision records. Its public files contain no client, product, or
+private-repository provenance.
 
 ## Repository map
 
-- `sources/`: evidence-based profiles of each source repository. These describe what exists and
-  distinguish reusable patterns from product-specific policy.
-- `model/`: the normalized architecture inferred across sources.
+- `model/`: the normalized architecture and reusable pattern catalog.
 - `templates/`: the portable files installed in a target repository.
 - `profiles/`: optional stack-specific context, loaded only for relevant tasks.
 - `bin/`: initializer and lightweight validation commands.
@@ -74,13 +67,12 @@ The boilerplate must guide an agent without making ordinary work ceremonial. A c
 already authorizes the in-scope work. The agent pauses only when a material choice is unresolved,
 new authority is required, or an operation is destructive or affects real external state.
 
-## Adding another project
+## Evolving the boilerplate
 
-1. Inventory its agent entrypoints, local instructions, skills, context files, hooks, and checks.
-2. Record observed behavior in a new `sources/<project>.md`; do not generalize yet.
-3. Classify every rule as universal, stack-specific, product-specific, or tool-specific.
-4. Update `model/pattern-catalog.md` only when the new source confirms or usefully challenges a
-   pattern.
+1. Evaluate a proposed pattern outside the public repository when its evidence is private.
+2. Classify it as universal, stack-specific, product-specific, or tool-specific.
+3. Add only the generalized rule and its technical rationale to `model/pattern-catalog.md`.
+4. Never record private repository names, paths, commits, customers, domains, or product details.
 5. Change a template only when the rule is broadly useful and enforceable in a fresh repository.
 
 ## What this is not

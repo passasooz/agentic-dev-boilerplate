@@ -1,6 +1,6 @@
 # Normalized agentic repository architecture
 
-The extracted model has five layers. A target repository can use only the layers it needs.
+The operating model has five layers. A target repository can use only the layers it needs.
 
 ## 1. Portable entrypoint
 

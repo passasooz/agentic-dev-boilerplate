@@ -1,31 +1,35 @@
 # Pattern catalog
 
-| Pattern | Clayos-v2 | Clayos-web | prenotazioni-wa | Boilerplate status |
-|---|---:|---:|---:|---|
-| Portable root `AGENTS.md` | Missing | Strong | Strong | Include |
-| Thin `CLAUDE.md` adapter | No | Strong | Strong | Include |
-| Explicit source-of-truth map | Strong | Partial/specialized | Simple code/tests rule | Include |
-| Package-local instructions | Strong | Not needed | Not needed | Optional |
-| Task-to-skill router | Strong | Strong | Absent | Include only when skills exist |
-| Specialist context prerequisites | Domain/spec focused | Design/copy focused | Runbook focused | Include |
-| Negative skill triggers | Partial | Strong | Not applicable | Include with optional skills |
-| Installed-stack docs over model memory | Local stack notes | Strong Next.js rule | Existing patterns + command catalog | Include as a pattern |
-| Invariants enforced by tests | Strong | Mostly skill checklists | Behavioral test suite | Include for critical rules |
-| Documented command catalog | Strong | Package scripts | Strong | Include when execution is non-obvious |
-| Proportional verification | Broad suite by default | Task/skill dependent | Strong focused-test policy | Include |
-| Documentation propagation | Strong | Limited | Divergence reporting | Include proportionally |
-| Mandatory second approval | Present | Absent | Absent | Exclude by default |
-| External tracker coupling | Strong | Absent | Issue references only | Optional adapter |
+This catalog records reusable decisions without retaining the identity or details of private source
+projects.
+
+| Pattern | Status | Rationale |
+|---|---|---|
+| Portable root `AGENTS.md` | Included | Gives different coding agents one small entrypoint. |
+| Thin harness adapters | Included | Avoids duplicating shared rules in harness-specific files. |
+| Explicit source-of-truth map | Included | Routes questions without loading all project context. |
+| Context loaded by task | Included | Reduces repeated discovery and unnecessary token use. |
+| Package-local instructions | Optional | Useful only when a subtree has meaningful extra constraints. |
+| Capability skills | Optional | Appropriate for repeated specialist workflows, not ordinary rules. |
+| Installed-stack docs over model memory | Included | Framework APIs and requirements change over time. |
+| OOP ownership and dependency direction | Included | Keeps application behavior cohesive and testable. |
+| Critical invariants enforced by tests | Included | Automation is stronger evidence than prose alone. |
+| Verified command catalog | Included | Prevents agents from guessing environment-specific commands. |
+| Proportional verification | Included | Focused checks save time while risk determines broader coverage. |
+| Immutable migration history | Database stacks | Avoids rewriting schema operations that may already have run. |
+| Durable decision and state records | Included | Prevents future sessions from reopening settled questions. |
+| Mandatory approval after every plan | Excluded | A clear request already authorizes normal in-scope work. |
+| External tracker coupling | Optional adapter | A reusable repository must not require one vendor or workflow. |
 
 ## Rule classification
 
-Before promoting a source rule into the template, classify it:
+Before promoting a rule into a template, classify it:
 
 - **Universal:** useful in most software repositories, such as search-before-create.
-- **Stack-specific:** valid only for a technology or version, such as consulting installed Next.js
-  documentation.
+- **Stack-specific:** valid only for a technology or version.
 - **Product-specific:** encodes domain, policy, customer, or compliance decisions.
-- **Tool-specific:** depends on a harness, tracker, MCP server, or command family.
+- **Tool-specific:** depends on a harness, tracker, plugin, or command family.
 
-Only universal rules belong in the base template. The other classes belong in optional local
-contracts, stack profiles, skills, or adapters.
+Only universal rules belong in the base template. Other classes belong in optional profiles, local
+contracts, skills, or adapters. Product-specific evidence and private provenance remain outside the
+public boilerplate.
